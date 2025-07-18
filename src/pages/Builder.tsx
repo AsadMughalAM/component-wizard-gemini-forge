@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Code, Eye, Sparkles, Download, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useComponents } from '@/hooks/useComponents';
+import { supabase } from '@/integrations/supabase/client';
 
 const Builder = () => {
   const { user, loading } = useAuth();
@@ -42,20 +43,18 @@ const Builder = () => {
 
     setIsGenerating(true);
     try {
-      const response = await fetch(`https://ppcslytljasqmivwrsre.functions.supabase.co/functions/v1/generate-component`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('generate-component', {
+        body: {
           prompt: prompt.trim(),
           componentName: componentName || 'GeneratedComponent',
           description: description || 'A generated React component'
-        }),
+        }
       });
 
-      const data = await response.json();
-      
+      if (error) {
+        throw new Error(error.message || 'Failed to generate component');
+      }
+
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate component');
       }
