@@ -17,8 +17,17 @@ serve(async (req) => {
     
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
+      console.error('GEMINI_API_KEY not configured in environment');
+      return new Response(JSON.stringify({ 
+        error: 'GEMINI_API_KEY not configured. Please add your Gemini API key to the Edge Function secrets.',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    console.log('Generating component with Gemini API...');
 
     const systemPrompt = `You are an expert React component generator. Generate high-quality, production-ready React TypeScript components with beautiful animations and modern design patterns.
 
