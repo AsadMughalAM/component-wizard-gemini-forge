@@ -10,16 +10,19 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Code, Eye, Sparkles, Download, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useComponents } from '@/hooks/useComponents';
 
 const Builder = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { saveComponent } = useComponents();
   const [componentName, setComponentName] = useState('');
   const [description, setDescription] = useState('');
   const [prompt, setPrompt] = useState('');
   const [generatedCode, setGeneratedCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -39,37 +42,87 @@ const Builder = () => {
 
     setIsGenerating(true);
     try {
-      // TODO: Implement Gemini API call
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
-      setGeneratedCode(`// Generated React Component
-import React from 'react';
-import { Button } from '@/components/ui/button';
+      const response = await fetch(`https://ppcslytljasqmivwrsre.functions.supabase.co/functions/v1/generate-component`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          componentName: componentName || 'GeneratedComponent',
+          description: description || 'A generated React component'
+        }),
+      });
 
-const ${componentName || 'GeneratedComponent'} = () => {
-  return (
-    <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
-      <h2 className="text-2xl font-bold mb-4">Generated Component</h2>
-      <p className="text-muted-foreground mb-4">${description || 'This is a generated component based on your prompt.'}</p>
-      <Button>Click me!</Button>
-    </div>
-  );
-};
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate component');
+      }
 
-export default ${componentName || 'GeneratedComponent'};`);
+      setGeneratedCode(data.generatedCode);
       
       toast({
         title: 'Success',
         description: 'Component generated successfully!',
       });
     } catch (error: any) {
+      console.error('Generation error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate component',
+        description: error.message || 'Failed to generate component',
         variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!componentName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a component name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveComponent({
+        name: componentName,
+        description: description || undefined,
+        prompt,
+        generated_code: generatedCode,
+        is_public: false,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Component saved successfully!',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save component',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([generatedCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${componentName || 'component'}.tsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -164,11 +217,22 @@ export default ${componentName || 'GeneratedComponent'};`);
                   </span>
                   {generatedCode && (
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={isSaving || !componentName.trim()}
+                      >
                         <Save className="h-4 w-4" />
+                        {isSaving ? 'Saving...' : 'Save'}
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleDownload}
+                      >
                         <Download className="h-4 w-4" />
+                        Download
                       </Button>
                     </div>
                   )}
