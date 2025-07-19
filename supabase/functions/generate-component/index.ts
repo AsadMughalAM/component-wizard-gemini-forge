@@ -15,6 +15,16 @@ serve(async (req) => {
   try {
     const { prompt, componentName, description } = await req.json();
     
+    if (!prompt || !componentName) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: prompt and componentName are required',
+        success: false 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
       console.error('GEMINI_API_KEY not configured in environment');
@@ -64,12 +74,46 @@ Generate ONLY the component code, no explanations.`;
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('Gemini API error:', error);
-      throw new Error(`Gemini API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Gemini API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText
+      });
+      
+      let errorMessage = `Gemini API error (${response.status})`;
+      if (response.status === 400) {
+        errorMessage = 'Invalid request to Gemini API. Please check your prompt.';
+      } else if (response.status === 401) {
+        errorMessage = 'Invalid Gemini API key. Please check your API key configuration.';
+      } else if (response.status === 403) {
+        errorMessage = 'Access denied to Gemini API. Please check your API key permissions.';
+      } else if (response.status === 429) {
+        errorMessage = 'Rate limit exceeded. Please try again later.';
+      }
+      
+      return new Response(JSON.stringify({ 
+        error: errorMessage,
+        success: false 
+      }), {
+        status: response.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await response.json();
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      console.error('Unexpected Gemini API response format:', data);
+      return new Response(JSON.stringify({ 
+        error: 'Gemini API returned unexpected response format',
+        success: false 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const generatedCode = data.candidates[0]?.content?.parts[0]?.text || '';
 
     // Clean up the code (remove markdown formatting if present)
