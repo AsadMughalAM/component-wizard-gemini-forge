@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import ComponentPreview from '@/components/ComponentPreview';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Code, Eye, Sparkles, Download, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useComponents } from '@/hooks/useComponents';
 import { supabase } from '@/integrations/supabase/client';
+import Editor from '@monaco-editor/react';
 
 const Builder = () => {
   const { user, loading } = useAuth();
@@ -251,13 +253,28 @@ const Builder = () => {
                   </TabsList>
                   
                   <TabsContent value="code">
-                    <div className="bg-muted/30 rounded-lg p-4 h-[500px] overflow-auto">
+                    <div className="rounded-lg h-[500px] overflow-hidden">
                       {generatedCode ? (
-                        <pre className="text-sm">
-                          <code>{generatedCode}</code>
-                        </pre>
+                        <Editor
+                          height="500px"
+                          defaultLanguage="typescript"
+                          value={generatedCode}
+                          theme="vs-dark"
+                          options={{
+                            readOnly: true,
+                            minimap: { enabled: false },
+                            scrollBeyondLastLine: false,
+                            wordWrap: 'on',
+                            fontSize: 14,
+                            lineNumbers: 'on',
+                            glyphMargin: false,
+                            folding: false,
+                            lineDecorationsWidth: 0,
+                            lineNumbersMinChars: 3,
+                          }}
+                        />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <div className="flex items-center justify-center h-full bg-muted/30 rounded-lg text-muted-foreground">
                           Generate a component to see the code here
                         </div>
                       )}
@@ -265,19 +282,11 @@ const Builder = () => {
                   </TabsContent>
                   
                   <TabsContent value="preview">
-                    <div className="bg-muted/30 rounded-lg p-4 h-[500px] flex items-center justify-center">
+                    <div className="bg-muted/30 rounded-lg p-4 h-[500px] overflow-auto">
                       {generatedCode ? (
-                        <div className="text-center">
-                          <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg">
-                            <h2 className="text-2xl font-bold mb-4">Generated Component</h2>
-                            <p className="text-muted-foreground mb-4">
-                              {description || 'This is a generated component based on your prompt.'}
-                            </p>
-                            <Button>Click me!</Button>
-                          </div>
-                        </div>
+                        <ComponentPreview code={generatedCode} />
                       ) : (
-                        <div className="text-muted-foreground">
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
                           Generate a component to see the preview here
                         </div>
                       )}
