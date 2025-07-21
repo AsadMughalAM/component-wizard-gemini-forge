@@ -63,6 +63,77 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /* Neon and glow animations for component previews */
+  .animate-neon-glow {
+    animation: neon-glow 2s ease-in-out infinite alternate;
+  }
+
+  .animate-neon-pulse {
+    animation: neon-pulse 1.5s ease-in-out infinite;
+  }
+
+  .animate-neon-border {
+    animation: neon-border 3s linear infinite;
+  }
+
+  .animate-glow-move {
+    animation: glow-move 4s ease-in-out infinite;
+  }
+
+  @keyframes neon-glow {
+    from {
+      box-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
+    }
+    to {
+      box-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+    }
+  }
+
+  @keyframes neon-pulse {
+    0%, 100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    50% {
+      opacity: 0.8;
+      filter: brightness(1.2);
+    }
+  }
+
+  @keyframes neon-border {
+    0% {
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+    }
+    25% {
+      border-color: hsl(var(--accent));
+      box-shadow: 0 0 15px hsl(var(--accent) / 0.5);
+    }
+    50% {
+      border-color: hsl(var(--secondary));
+      box-shadow: 0 0 20px hsl(var(--secondary) / 0.5);
+    }
+    75% {
+      border-color: hsl(var(--accent));
+      box-shadow: 0 0 15px hsl(var(--accent) / 0.5);
+    }
+    100% {
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+    }
+  }
+
+  @keyframes glow-move {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
   .dark {
     --background: 225 25% 8%;
     --foreground: 220 18% 97%;

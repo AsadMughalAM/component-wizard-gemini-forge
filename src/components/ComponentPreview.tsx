@@ -36,20 +36,29 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
 
   const createActualComponent = useCallback((code: string) => {
     try {
-      // Remove imports and exports
+      // Remove imports and exports more thoroughly
       let cleanCode = code
-        .replace(/import[^;]*;/g, '')
-        .replace(/export\s+default\s+/, '')
-        .replace(/export\s+\{[^}]+\}\s*;?/g, '')
+        .replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, '')
+        .replace(/export\s+(default\s+)?/g, '')
+        .replace(/export\s*\{[^}]*\}\s*;?\s*/g, '')
         .trim();
 
-      // Extract component name
-      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)\s*[=\(]/);
+      // Extract component name - handle various patterns
+      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)\s*[=\(]/) ||
+                           cleanCode.match(/(\w+)\s*=\s*\([^)]*\)\s*=>/);
       const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
 
-      // Handle arrow functions
+      // Handle different component patterns
       if (cleanCode.includes('const ') && cleanCode.includes(' = ')) {
+        // Arrow function component
         cleanCode = cleanCode.replace(/const\s+\w+\s*=\s*/, '');
+      } else if (cleanCode.includes('function ')) {
+        // Function declaration - keep as is
+      }
+
+      // If no return statement, wrap in a function
+      if (!cleanCode.includes('return') && !cleanCode.includes('=>')) {
+        cleanCode = `() => { return ${cleanCode}; }`;
       }
 
       // Create comprehensive evaluation context with all available dependencies
@@ -154,18 +163,34 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
       const paramNames = Object.keys(evalContext);
       const paramValues = Object.values(evalContext);
 
-      // Create the component function with proper context
+      // Create the component function with proper context and better error handling
       const componentFunction = new Function(
         ...paramNames,
         `
         try {
-          // Define the component
-          ${cleanCode.includes('return') ? `const ${componentName} = ${cleanCode}` : cleanCode}
+          "use strict";
           
-          // Return the component
-          return ${componentName};
+          // Check if it's already a component function
+          if (typeof (${cleanCode}) === 'function') {
+            return (${cleanCode});
+          }
+          
+          // Try to evaluate as component definition
+          let component;
+          ${cleanCode.includes('return') && !cleanCode.includes('function') && !cleanCode.includes('=>') 
+            ? `component = function ${componentName}() { ${cleanCode} };`
+            : `component = ${cleanCode.includes('return') ? `function ${componentName}() { ${cleanCode} }` : cleanCode}`
+          }
+          
+          // Ensure it's a valid React component
+          if (typeof component !== 'function') {
+            throw new Error('Generated code is not a valid React component function');
+          }
+          
+          return component;
         } catch (error) {
           console.error('Component evaluation error:', error);
+          console.log('Clean code:', \`${cleanCode}\`);
           throw new Error('Component evaluation failed: ' + error.message);
         }
         `
@@ -173,6 +198,12 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
 
       // Execute with context
       const component = componentFunction(...paramValues);
+      
+      // Validate the component
+      if (typeof component !== 'function') {
+        throw new Error('Generated component is not a valid React component');
+      }
+      
       return component;
     } catch (error: any) {
       console.error('Component creation error:', error);
@@ -233,24 +264,19 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
     try {
       setError('');
       
-      // Always try to create the actual component first
+      // Always create the actual component - no more fallbacks
       const Component = createActualComponent(code);
       setPreviewComponent(() => Component);
       
     } catch (error: any) {
       console.error('Preview error:', error);
+      console.log('Failed code:', code);
       
-      // Fall back to mock if actual component creation fails
-      try {
-        const MockComponent = createMockComponent(code);
-        setPreviewComponent(() => MockComponent);
-        setError(''); // Clear error for mock preview
-      } catch (mockError: any) {
-        setError(error.message || 'Failed to render component preview');
-        setPreviewComponent(null);
-      }
+      // Only show error, no fallback
+      setError(`Component render failed: ${error.message}`);
+      setPreviewComponent(null);
     }
-  }, [code, checkForUnsupportedDependencies, createActualComponent, createMockComponent]);
+  }, [code, checkForUnsupportedDependencies, createActualComponent]);
 
   if (error) {
     return (
