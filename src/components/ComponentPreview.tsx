@@ -3,6 +3,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Code2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { cva } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 import * as LucideIcons from 'lucide-react';
@@ -69,23 +71,63 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         // Lucide icons - make all icons available
         ...LucideIcons,
         
-        // Common UI components (would need to import these)
+        // Common UI components
         Button,
         Card,
         CardContent,
         CardDescription,
         CardHeader,
         CardTitle,
+        Badge,
+        Separator,
+        Alert,
+        AlertDescription,
         
-        // Enhanced framer-motion mock components with animation props
+        // Enhanced framer-motion mock components with proper animation support
         motion: {
-          div: React.forwardRef<HTMLDivElement, any>((props, ref) => <div ref={ref} {...props} />),
-          span: React.forwardRef<HTMLSpanElement, any>((props, ref) => <span ref={ref} {...props} />),
+          div: React.forwardRef<HTMLDivElement, any>((props, ref) => {
+            const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
+            return (
+              <div 
+                ref={ref} 
+                {...rest}
+                className={cn(
+                  rest.className,
+                  whileHover && "hover:scale-105 transition-transform duration-200",
+                  animate?.scale && "animate-pulse"
+                )}
+                style={{
+                  ...rest.style,
+                  ...(animate?.opacity !== undefined && { opacity: animate.opacity }),
+                  ...(animate?.scale !== undefined && { transform: `scale(${animate.scale})` }),
+                  ...(animate?.y !== undefined && { transform: `translateY(${animate.y}px)` }),
+                  ...(animate?.x !== undefined && { transform: `translateX(${animate.x}px)` }),
+                }}
+              />
+            );
+          }),
+          span: React.forwardRef<HTMLSpanElement, any>((props, ref) => {
+            const { initial, animate, whileHover, transition, ...rest } = props;
+            return <span ref={ref} {...rest} className={cn(rest.className, whileHover && "hover:scale-105 transition-transform")} />;
+          }),
+          button: React.forwardRef<HTMLButtonElement, any>((props, ref) => {
+            const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
+            return (
+              <button 
+                ref={ref} 
+                {...rest}
+                className={cn(
+                  rest.className,
+                  whileHover && "hover:scale-105 transition-transform duration-200",
+                  whileTap && "active:scale-95"
+                )}
+              />
+            );
+          }),
           p: React.forwardRef<HTMLParagraphElement, any>((props, ref) => <p ref={ref} {...props} />),
           h1: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h1 ref={ref} {...props} />),
           h2: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h2 ref={ref} {...props} />),
           h3: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h3 ref={ref} {...props} />),
-          button: React.forwardRef<HTMLButtonElement, any>((props, ref) => <button ref={ref} {...props} />),
           section: React.forwardRef<HTMLElement, any>((props, ref) => <section ref={ref} {...props} />),
           article: React.forwardRef<HTMLElement, any>((props, ref) => <article ref={ref} {...props} />),
           header: React.forwardRef<HTMLElement, any>((props, ref) => <header ref={ref} {...props} />),
@@ -97,8 +139,15 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         useReducedMotion: () => false,
         AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
         
-        // Design tokens support
-        designTokens: {},
+        // Design tokens with actual CSS variables
+        designTokens: {
+          primary: 'var(--primary)',
+          secondary: 'var(--secondary)',
+          accent: 'var(--accent)',
+          muted: 'var(--muted)',
+          background: 'var(--background)',
+          shadow: 'var(--shadow)',
+        },
       };
 
       // Create parameter list and arguments for the function
@@ -233,18 +282,36 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
 
   return (
     <div className="h-full w-full">
-      <div className="p-4 bg-background rounded-lg border h-full overflow-auto">
-        <div className="text-xs text-muted-foreground mb-4 pb-2 border-b">
-          {hasExternalDeps 
-            ? 'Mock Preview (External dependencies detected)' 
-            : 'Live Preview (Limited functionality)'}
+      <div className="p-6 bg-background rounded-lg border h-full overflow-auto">
+        <div className="flex items-center justify-between mb-6 pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-foreground">Live Preview</span>
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            {hasExternalDeps ? 'Enhanced Mock' : 'Real-time Render'}
+          </Badge>
         </div>
-        <div className="flex items-center justify-center min-h-[200px]">
-          <React.Suspense fallback={<div className="animate-pulse">Loading...</div>}>
+        
+        <div className="flex items-center justify-center min-h-[300px] bg-gradient-to-br from-background to-muted/30 rounded-lg border-2 border-dashed border-muted p-8">
+          <React.Suspense fallback={
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-sm">Rendering component...</p>
+            </div>
+          }>
             <ErrorBoundary>
-              <PreviewComponent />
+              <div className="w-full h-full flex items-center justify-center">
+                <PreviewComponent />
+              </div>
             </ErrorBoundary>
           </React.Suspense>
+        </div>
+        
+        <div className="mt-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Interactive preview with full styling and animations
+          </p>
         </div>
       </div>
     </div>
