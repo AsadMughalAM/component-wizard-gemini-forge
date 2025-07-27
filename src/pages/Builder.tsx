@@ -67,11 +67,12 @@ const Builder = () => {
         title: 'Success',
         description: 'Component generated successfully!',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Generation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate component';
       toast({
         title: 'Error',
-        description: error.message || 'Failed to generate component',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -103,10 +104,11 @@ const Builder = () => {
         title: 'Success',
         description: 'Component saved successfully!',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save component';
       toast({
         title: 'Error',
-        description: 'Failed to save component',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

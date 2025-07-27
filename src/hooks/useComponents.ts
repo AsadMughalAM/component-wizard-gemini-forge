@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -21,7 +21,7 @@ export const useComponents = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
-  const fetchComponents = async () => {
+  const fetchComponents = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -34,7 +34,8 @@ export const useComponents = () => {
 
       if (error) throw error;
       setComponents(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error('Error fetching components:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch components',
@@ -43,7 +44,7 @@ export const useComponents = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   const saveComponent = async (componentData: {
     name: string;
@@ -83,7 +84,7 @@ export const useComponents = () => {
 
   useEffect(() => {
     fetchComponents();
-  }, [user]);
+  }, [fetchComponents]);
 
   return {
     components,
