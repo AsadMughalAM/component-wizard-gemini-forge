@@ -9,6 +9,15 @@ import { cva } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 import * as LucideIcons from 'lucide-react';
 
+// Define proper types for motion component props
+interface MotionProps {
+  initial?: Record<string, unknown>;
+  animate?: Record<string, unknown>;
+  whileHover?: Record<string, unknown>;
+  whileTap?: Record<string, unknown>;
+  transition?: Record<string, unknown>;
+}
+
 interface ComponentPreviewProps {
   code: string;
 }
@@ -44,7 +53,7 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         .trim();
 
       // Extract component name - handle various patterns
-      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)\s*[=\(]/) ||
+      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)\s*[=(]/) ||
                            cleanCode.match(/(\w+)\s*=\s*\([^)]*\)\s*=>/);
       const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
 
@@ -94,7 +103,7 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         
         // Enhanced framer-motion mock components with proper animation support
         motion: {
-          div: React.forwardRef<HTMLDivElement, any>((props, ref) => {
+          div: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & MotionProps>((props, ref) => {
             const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
             return (
               <div 
@@ -115,11 +124,11 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
               />
             );
           }),
-          span: React.forwardRef<HTMLSpanElement, any>((props, ref) => {
+          span: React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement> & MotionProps>((props, ref) => {
             const { initial, animate, whileHover, transition, ...rest } = props;
             return <span ref={ref} {...rest} className={cn(rest.className, whileHover && "hover:scale-105 transition-transform")} />;
           }),
-          button: React.forwardRef<HTMLButtonElement, any>((props, ref) => {
+          button: React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & MotionProps>((props, ref) => {
             const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
             return (
               <button 
@@ -133,15 +142,15 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
               />
             );
           }),
-          p: React.forwardRef<HTMLParagraphElement, any>((props, ref) => <p ref={ref} {...props} />),
-          h1: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h1 ref={ref} {...props} />),
-          h2: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h2 ref={ref} {...props} />),
-          h3: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h3 ref={ref} {...props} />),
-          section: React.forwardRef<HTMLElement, any>((props, ref) => <section ref={ref} {...props} />),
-          article: React.forwardRef<HTMLElement, any>((props, ref) => <article ref={ref} {...props} />),
-          header: React.forwardRef<HTMLElement, any>((props, ref) => <header ref={ref} {...props} />),
-          footer: React.forwardRef<HTMLElement, any>((props, ref) => <footer ref={ref} {...props} />),
-          nav: React.forwardRef<HTMLElement, any>((props, ref) => <nav ref={ref} {...props} />)
+          p: React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>((props, ref) => <p ref={ref} {...props} />),
+          h1: React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>((props, ref) => <h1 ref={ref} {...props} />),
+          h2: React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>((props, ref) => <h2 ref={ref} {...props} />),
+          h3: React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>((props, ref) => <h3 ref={ref} {...props} />),
+          section: React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>((props, ref) => <section ref={ref} {...props} />),
+          article: React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>((props, ref) => <article ref={ref} {...props} />),
+          header: React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>((props, ref) => <header ref={ref} {...props} />),
+          footer: React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>((props, ref) => <footer ref={ref} {...props} />),
+          nav: React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>((props, ref) => <nav ref={ref} {...props} />)
         },
         
         // Additional framer-motion utilities
@@ -205,15 +214,16 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
       }
       
       return component;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Component creation error:', error);
-      throw new Error(`Failed to create component: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to create component: ${errorMessage}`);
     }
   }, []);
 
   const extractComponentInfo = useCallback((code: string) => {
     // Extract component name
-    const componentMatch = code.match(/(?:const|function)\s+(\w+)\s*[=\(]/);
+    const componentMatch = code.match(/(?:const|function)\s+(\w+)\s*[=(]/);
     const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
     
     // Extract description from comments or JSDoc
@@ -268,12 +278,13 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
       const Component = createActualComponent(code);
       setPreviewComponent(() => Component);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Preview error:', error);
       console.log('Failed code:', code);
       
       // Only show error, no fallback
-      setError(`Component render failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Component render failed: ${errorMessage}`);
       setPreviewComponent(null);
     }
   }, [code, checkForUnsupportedDependencies, createActualComponent]);
