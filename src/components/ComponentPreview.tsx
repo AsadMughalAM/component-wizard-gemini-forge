@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Code2, ExternalLink } from 'lucide-react';
@@ -16,53 +17,19 @@ interface ComponentPreviewProps {
 const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
   const [PreviewComponent, setPreviewComponent] = useState<React.ComponentType | null>(null);
   const [error, setError] = useState<string>('');
-  const [hasExternalDeps, setHasExternalDeps] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const checkForUnsupportedDependencies = useCallback((code: string) => {
-    // We can handle most dependencies now, so only mark truly unsupported ones
-    const unsupportedDeps = [
-      'react-hook-form',
-      'zod',
-      '@hookform/resolvers'
-    ];
-    
-    return unsupportedDeps.some(dep => 
-      code.includes(`from '${dep}'`) || 
-      code.includes(`from "${dep}"`) ||
-      code.includes(`} from '${dep}'`) ||
-      code.includes(`} from "${dep}"`)
-    );
-  }, []);
-
-  const createActualComponent = useCallback((code: string) => {
+  const createComponentFromCode = useCallback((code: string) => {
     try {
-      // Remove imports and exports more thoroughly
+      // Clean the code - remove imports and exports
       let cleanCode = code
         .replace(/import\s+.*?from\s+['"][^'"]*['"];?\s*/g, '')
         .replace(/export\s+(default\s+)?/g, '')
         .replace(/export\s*\{[^}]*\}\s*;?\s*/g, '')
         .trim();
 
-      // Extract component name - handle various patterns
-      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)\s*[=\(]/) ||
-                           cleanCode.match(/(\w+)\s*=\s*\([^)]*\)\s*=>/);
-      const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
-
-      // Handle different component patterns
-      if (cleanCode.includes('const ') && cleanCode.includes(' = ')) {
-        // Arrow function component
-        cleanCode = cleanCode.replace(/const\s+\w+\s*=\s*/, '');
-      } else if (cleanCode.includes('function ')) {
-        // Function declaration - keep as is
-      }
-
-      // If no return statement, wrap in a function
-      if (!cleanCode.includes('return') && !cleanCode.includes('=>')) {
-        cleanCode = `() => { return ${cleanCode}; }`;
-      }
-
-      // Create comprehensive evaluation context with all available dependencies
-      const evalContext = {
+      // Create comprehensive context with all available dependencies
+      const componentContext = {
         React,
         useState: React.useState,
         useEffect: React.useEffect,
@@ -71,16 +38,14 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         useRef: React.useRef,
         Fragment: React.Fragment,
         
-        // class-variance-authority
+        // Styling utilities
         cva,
-        
-        // Utils
         cn,
         
-        // Lucide icons - make all icons available
+        // All Lucide icons
         ...LucideIcons,
         
-        // Common UI components
+        // UI Components
         Button,
         Card,
         CardContent,
@@ -92,32 +57,79 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
         Alert,
         AlertDescription,
         
-        // Enhanced framer-motion mock components with proper animation support
+        // Enhanced motion components with proper animation support
         motion: {
           div: React.forwardRef<HTMLDivElement, any>((props, ref) => {
-            const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
+            const { 
+              initial, 
+              animate, 
+              whileHover, 
+              whileTap, 
+              transition, 
+              variants,
+              ...rest 
+            } = props;
+            
+            const [isHovered, setIsHovered] = useState(false);
+            const [isTapped, setIsTapped] = useState(false);
+            
+            // Calculate styles based on animation props
+            const getAnimationStyles = () => {
+              let styles: React.CSSProperties = { ...rest.style };
+              
+              // Apply initial styles
+              if (initial) {
+                if (initial.opacity !== undefined) styles.opacity = initial.opacity;
+                if (initial.scale !== undefined) styles.transform = `scale(${initial.scale})`;
+                if (initial.y !== undefined) styles.transform = `translateY(${initial.y}px)`;
+                if (initial.x !== undefined) styles.transform = `translateX(${initial.x}px)`;
+              }
+              
+              // Apply animate styles (override initial)
+              if (animate) {
+                if (animate.opacity !== undefined) styles.opacity = animate.opacity;
+                if (animate.scale !== undefined) styles.transform = `scale(${animate.scale})`;
+                if (animate.y !== undefined) styles.transform = `translateY(${animate.y}px)`;
+                if (animate.x !== undefined) styles.transform = `translateX(${animate.x}px)`;
+              }
+              
+              // Apply hover styles
+              if (isHovered && whileHover) {
+                if (whileHover.scale !== undefined) {
+                  styles.transform = `scale(${whileHover.scale})`;
+                }
+                if (whileHover.opacity !== undefined) {
+                  styles.opacity = whileHover.opacity;
+                }
+              }
+              
+              // Apply tap styles
+              if (isTapped && whileTap) {
+                if (whileTap.scale !== undefined) {
+                  styles.transform = `scale(${whileTap.scale})`;
+                }
+              }
+              
+              return styles;
+            };
+            
             return (
               <div 
                 ref={ref} 
                 {...rest}
+                style={getAnimationStyles()}
                 className={cn(
                   rest.className,
-                  whileHover && "hover:scale-105 transition-transform duration-200",
-                  animate?.scale && "animate-pulse"
+                  "transition-all duration-300 ease-out",
+                  whileHover && "cursor-pointer"
                 )}
-                style={{
-                  ...rest.style,
-                  ...(animate?.opacity !== undefined && { opacity: animate.opacity }),
-                  ...(animate?.scale !== undefined && { transform: `scale(${animate.scale})` }),
-                  ...(animate?.y !== undefined && { transform: `translateY(${animate.y}px)` }),
-                  ...(animate?.x !== undefined && { transform: `translateX(${animate.x}px)` }),
-                }}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
+                onMouseDown={() => setIsTapped(true)}
+                onMouseUp={() => setIsTapped(false)}
+                onMouseLeave={() => setIsTapped(false)}
               />
             );
-          }),
-          span: React.forwardRef<HTMLSpanElement, any>((props, ref) => {
-            const { initial, animate, whileHover, transition, ...rest } = props;
-            return <span ref={ref} {...rest} className={cn(rest.className, whileHover && "hover:scale-105 transition-transform")} />;
           }),
           button: React.forwardRef<HTMLButtonElement, any>((props, ref) => {
             const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
@@ -127,156 +139,114 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
                 {...rest}
                 className={cn(
                   rest.className,
-                  whileHover && "hover:scale-105 transition-transform duration-200",
+                  "transition-all duration-200",
+                  whileHover && "hover:scale-105",
                   whileTap && "active:scale-95"
                 )}
               />
             );
+          }),
+          span: React.forwardRef<HTMLSpanElement, any>((props, ref) => {
+            const { initial, animate, whileHover, whileTap, transition, ...rest } = props;
+            return <span ref={ref} {...rest} className={cn(rest.className, "transition-all duration-200")} />;
           }),
           p: React.forwardRef<HTMLParagraphElement, any>((props, ref) => <p ref={ref} {...props} />),
           h1: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h1 ref={ref} {...props} />),
           h2: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h2 ref={ref} {...props} />),
           h3: React.forwardRef<HTMLHeadingElement, any>((props, ref) => <h3 ref={ref} {...props} />),
           section: React.forwardRef<HTMLElement, any>((props, ref) => <section ref={ref} {...props} />),
-          article: React.forwardRef<HTMLElement, any>((props, ref) => <article ref={ref} {...props} />),
-          header: React.forwardRef<HTMLElement, any>((props, ref) => <header ref={ref} {...props} />),
-          footer: React.forwardRef<HTMLElement, any>((props, ref) => <footer ref={ref} {...props} />),
-          nav: React.forwardRef<HTMLElement, any>((props, ref) => <nav ref={ref} {...props} />)
         },
         
-        // Additional framer-motion utilities
-        useReducedMotion: () => false,
+        // Framer Motion utilities
         AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
         
-        // Design tokens with actual CSS variables
+        // Design tokens using CSS variables
         designTokens: {
-          primary: 'var(--primary)',
-          secondary: 'var(--secondary)',
-          accent: 'var(--accent)',
-          muted: 'var(--muted)',
-          background: 'var(--background)',
-          shadow: 'var(--shadow)',
+          primary: 'hsl(var(--primary))',
+          secondary: 'hsl(var(--secondary))',
+          accent: 'hsl(var(--accent))',
+          muted: 'hsl(var(--muted))',
+          background: 'hsl(var(--background))',
+          foreground: 'hsl(var(--foreground))',
         },
       };
 
-      // Create parameter list and arguments for the function
-      const paramNames = Object.keys(evalContext);
-      const paramValues = Object.values(evalContext);
+      // Extract component name for better error handling
+      const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)/);
+      const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
 
-      // Create the component function with proper context and better error handling
-      const componentFunction = new Function(
+      // Prepare the code for evaluation
+      let executableCode = cleanCode;
+      
+      // Handle different component patterns
+      if (cleanCode.includes('const ') && cleanCode.includes('= (')) {
+        // Arrow function component - extract the function
+        const functionMatch = cleanCode.match(/const\s+\w+\s*=\s*(.+)/s);
+        if (functionMatch) {
+          executableCode = functionMatch[1];
+        }
+      } else if (cleanCode.includes('function ')) {
+        // Function declaration - wrap in return
+        executableCode = `function() { ${cleanCode}; return ${componentName}; }()`;
+      }
+
+      // Create the evaluation function
+      const paramNames = Object.keys(componentContext);
+      const paramValues = Object.values(componentContext);
+      
+      const evaluationFunction = new Function(
         ...paramNames,
         `
+        "use strict";
         try {
-          "use strict";
-          
-          // Check if it's already a component function
-          if (typeof (${cleanCode}) === 'function') {
-            return (${cleanCode});
-          }
-          
-          // Try to evaluate as component definition
-          let component;
-          ${cleanCode.includes('return') && !cleanCode.includes('function') && !cleanCode.includes('=>') 
-            ? `component = function ${componentName}() { ${cleanCode} };`
-            : `component = ${cleanCode.includes('return') ? `function ${componentName}() { ${cleanCode} }` : cleanCode}`
-          }
-          
-          // Ensure it's a valid React component
+          const component = ${executableCode};
           if (typeof component !== 'function') {
-            throw new Error('Generated code is not a valid React component function');
+            throw new Error('Generated code must return a React component function');
           }
-          
           return component;
         } catch (error) {
-          console.error('Component evaluation error:', error);
-          console.log('Clean code:', \`${cleanCode}\`);
-          throw new Error('Component evaluation failed: ' + error.message);
+          console.error('Component evaluation failed:', error);
+          throw error;
         }
         `
       );
 
-      // Execute with context
-      const component = componentFunction(...paramValues);
+      // Execute and get the component
+      const component = evaluationFunction(...paramValues);
       
-      // Validate the component
       if (typeof component !== 'function') {
-        throw new Error('Generated component is not a valid React component');
+        throw new Error('Invalid component: expected a function');
       }
       
       return component;
+      
     } catch (error: any) {
       console.error('Component creation error:', error);
       throw new Error(`Failed to create component: ${error.message}`);
     }
   }, []);
 
-  const extractComponentInfo = useCallback((code: string) => {
-    // Extract component name
-    const componentMatch = code.match(/(?:const|function)\s+(\w+)\s*[=\(]/);
-    const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
-    
-    // Extract description from comments or JSDoc
-    const descriptionMatch = code.match(/\/\*\*(.*?)\*\//s) || code.match(/\/\/(.*?)$/m);
-    const description = descriptionMatch ? descriptionMatch[1].replace(/\*/g, '').trim() : null;
-    
-    return { componentName, description };
-  }, []);
-
-  const createMockComponent = useCallback((code: string) => {
-    const { componentName, description } = extractComponentInfo(code);
-    
-    return () => (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center">
-            <Code2 className="w-8 h-8 text-primary" />
-          </div>
-          <CardTitle className="text-xl">{componentName}</CardTitle>
-          <CardDescription>
-            {description || 'This component uses complex dependencies that cannot be fully previewed.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <Alert>
-            <ExternalLink className="h-4 w-4" />
-            <AlertDescription className="text-left">
-              <strong>Preview Limitation:</strong> Some advanced features may not work in the preview environment. 
-              The generated code is fully functional when used in your project.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }, [extractComponentInfo]);
-
   useEffect(() => {
     if (!code.trim()) {
       setPreviewComponent(null);
       setError('');
-      setHasExternalDeps(false);
       return;
     }
 
-    const hasUnsupportedDeps = checkForUnsupportedDependencies(code);
-    setHasExternalDeps(hasUnsupportedDeps);
+    setIsLoading(true);
+    setError('');
 
     try {
-      setError('');
-      
-      // Always create the actual component - no more fallbacks
-      const Component = createActualComponent(code);
+      const Component = createComponentFromCode(code);
       setPreviewComponent(() => Component);
-      
     } catch (error: any) {
-      console.error('Preview error:', error);
-      console.log('Failed code:', code);
-      
-      // Only show error, no fallback
-      setError(`Component render failed: ${error.message}`);
+      console.error('Preview generation failed:', error);
+      setError(`Preview Error: ${error.message}`);
       setPreviewComponent(null);
+    } finally {
+      setIsLoading(false);
     }
-  }, [code, checkForUnsupportedDependencies, createActualComponent]);
+  }, [code, createComponentFromCode]);
 
   if (error) {
     return (
@@ -286,8 +256,8 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
           <AlertDescription>
             <strong>Preview Error:</strong> {error}
             <br />
-            <span className="text-xs mt-2 block">
-              The component might contain complex syntax that can't be previewed safely.
+            <span className="text-xs mt-2 block opacity-75">
+              The component contains syntax that cannot be safely previewed. The generated code is still valid for use in your project.
             </span>
           </AlertDescription>
         </Alert>
@@ -295,12 +265,12 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
     );
   }
 
-  if (!PreviewComponent) {
+  if (isLoading || !PreviewComponent) {
     return (
       <div className="h-full flex items-center justify-center text-muted-foreground">
         <div className="text-center">
-          <div className="animate-pulse mb-2">🔄</div>
-          <p>Preparing preview...</p>
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm">Rendering component...</p>
         </div>
       </div>
     );
@@ -315,15 +285,15 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
             <span className="text-sm font-medium text-foreground">Live Preview</span>
           </div>
           <Badge variant="secondary" className="text-xs">
-            {hasExternalDeps ? 'Enhanced Mock' : 'Real-time Render'}
+            Real-time Render
           </Badge>
         </div>
         
-        <div className="flex items-center justify-center min-h-[300px] bg-gradient-to-br from-background to-muted/30 rounded-lg border-2 border-dashed border-muted p-8">
+        <div className="flex items-center justify-center min-h-[300px] bg-gradient-to-br from-background to-muted/20 rounded-lg border-2 border-dashed border-muted p-8">
           <React.Suspense fallback={
             <div className="flex flex-col items-center gap-3 text-muted-foreground">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-sm">Rendering component...</p>
+              <p className="text-sm">Loading component...</p>
             </div>
           }>
             <ErrorBoundary>
@@ -344,7 +314,7 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
   );
 };
 
-// Error boundary component to catch runtime errors
+// Enhanced Error Boundary
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error?: Error }
@@ -359,7 +329,11 @@ class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Component preview error:', error, errorInfo);
+    console.error('Component preview runtime error:', {
+      error: error.message,
+      stack: error.stack,
+      errorInfo
+    });
   }
 
   render() {
@@ -370,8 +344,8 @@ class ErrorBoundary extends React.Component<
           <AlertDescription>
             <strong>Runtime Error:</strong> The component encountered an error while rendering.
             <br />
-            <span className="text-xs mt-2 block">
-              {this.state.error?.message || 'Unknown error occurred'}
+            <span className="text-xs mt-2 block opacity-75">
+              {this.state.error?.message || 'Component failed to render properly'}
             </span>
           </AlertDescription>
         </Alert>
