@@ -9,7 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { cva } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 import * as LucideIcons from 'lucide-react';
-
+// @ts-ignore - types declared in src/types/babel-standalone.d.ts
+import * as Babel from '@babel/standalone';
 interface ComponentPreviewProps {
   code: string;
 }
@@ -177,19 +178,35 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
       const componentMatch = cleanCode.match(/(?:const|function)\s+(\w+)/);
       const componentName = componentMatch ? componentMatch[1] : 'GeneratedComponent';
 
-      // Prepare the code for evaluation
+      // Prepare code (determine expression or wrap)
       let executableCode = cleanCode;
       
-      // Handle different component patterns
-      if (cleanCode.includes('const ') && cleanCode.includes('= (')) {
-        // Arrow function component - extract the function
-        const functionMatch = cleanCode.match(/const\s+\w+\s*=\s*(.+)/s);
-        if (functionMatch) {
-          executableCode = functionMatch[1];
-        }
+      // Handle different component patterns including bare arrow functions
+      const assignMatch = cleanCode.match(/^(?:const|let|var)\s+\w+\s*=\s*([\s\S]+)$/);
+      if (assignMatch) {
+        // const Comp = () => (...)
+        executableCode = assignMatch[1].trim();
+      } else if (/^\s*\(?[\w\s,{}\[\]]*\)?\s*=>/.test(cleanCode.trim())) {
+        // Bare arrow function expression: () => (...)
+        executableCode = cleanCode.trim();
       } else if (cleanCode.includes('function ')) {
-        // Function declaration - wrap in return
+        // Function declaration - wrap in return so we can evaluate to a value
         executableCode = `function() { ${cleanCode}; return ${componentName}; }()`;
+      }
+
+      // Transform TSX/JSX to plain JS using Babel so evaluation won't choke on '<'
+      try {
+        const transformed = Babel.transform(executableCode, {
+          presets: [
+            ['typescript', { isTSX: true, allExtensions: true }],
+            ['react', { runtime: 'classic' }],
+          ],
+          filename: 'ComponentPreview.tsx',
+        }).code || '';
+        executableCode = transformed;
+      } catch (e) {
+        console.error('Babel transform failed:', e);
+        throw e as any;
       }
 
       // Create the evaluation function
