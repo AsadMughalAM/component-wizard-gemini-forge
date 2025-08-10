@@ -124,10 +124,12 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
                   whileHover && "cursor-pointer"
                 )}
                 onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+                onMouseLeave={() => {
+                  setIsHovered(false);
+                  setIsTapped(false);
+                }}
                 onMouseDown={() => setIsTapped(true)}
                 onMouseUp={() => setIsTapped(false)}
-                onMouseLeave={() => setIsTapped(false)}
               />
             );
           }),
