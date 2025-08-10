@@ -180,21 +180,28 @@ const ComponentPreview: React.FC<ComponentPreviewProps> = ({ code }) => {
 
       // Prepare code (determine expression or wrap)
       let executableCode = cleanCode;
-      
-      // Handle different component patterns including bare arrow functions
-      const assignMatch = cleanCode.match(/^(?:const|let|var)\s+\w+\s*=\s*([\s\S]+)$/);
+
+      // Detect common patterns
+      const trimmed = cleanCode.trim();
+      const assignMatch = trimmed.match(/^(?:const|let|var)\s+\w+\s*=\s*([\s\S]+)$/);
+      const isBareArrow = /^\(?[\w\s,{}\[\]:?=]*\)?\s*=>/.test(trimmed);
+      const hasVarDeclForName = new RegExp(`^(?:[\s\S]*?)(?:const|let|var)\\s+${componentName}\\s*=`).test(trimmed);
+
       if (assignMatch) {
         // const Comp = () => (...)
         executableCode = assignMatch[1].trim();
-      } else if (/^\s*\(?[\w\s,{}\[\]]*\)?\s*=>/.test(cleanCode.trim())) {
+      } else if (isBareArrow) {
         // Bare arrow function expression: () => (...)
-        executableCode = cleanCode.trim();
+        executableCode = trimmed;
       } else if (cleanCode.includes('function ')) {
-        // Function declaration - wrap in return so we can evaluate to a value
-        executableCode = `function() { ${cleanCode}; return ${componentName}; }()`;
+        // Function declaration - wrap and return the identifier
+        executableCode = `(() => { ${cleanCode}; return ${componentName}; })()`;
+      } else if (hasVarDeclForName) {
+        // Variable declaration somewhere in the code - wrap and return the identifier
+        executableCode = `(() => { ${cleanCode}; return ${componentName}; })()`;
       }
 
-      // Transform TSX/JSX to plain JS using Babel so evaluation won't choke on '<'
+      // Transform TSX/JSX to plain JS using Babel so evaluation won't choke on '<' or TS
       try {
         const transformed = Babel.transform(executableCode, {
           presets: [
